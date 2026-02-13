@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    --color-bg: #fafaf9;
+    --color-surface: #ffffff;
+    --color-primary: #237a53;
+    --color-primary-light: #f0f9f4;
+    --color-text: #1c1917;
+    --color-text-secondary: #57534e;
+    --color-text-muted: #a8a29e;
+    --color-border: #e7e5e4;
+    --color-border-light: #f5f5f4;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-stone-50 text-stone-900 font-sans;
+    line-height: 1.6;
+  }
+
+  /* Focus visible for accessibility */
+  *:focus-visible {
+    @apply outline-2 outline-offset-2 outline-emerald-500;
+  }
+}
+
+@layer components {
+  .container-page {
+    @apply max-w-6xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Smooth card hover */
+  .card-hover {
+    @apply transition-all duration-200 hover:shadow-md hover:-translate-y-0.5;
+  }
+
+  /* Shimmer loading effect */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      theme('colors.stone.200') 0%,
+      theme('colors.stone.100') 50%,
+      theme('colors.stone.200') 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s ease-in-out infinite;
+  }
+
+  /* Calendar heatmap cells */
+  .heatmap-cell {
+    @apply rounded-md transition-colors duration-150;
+  }
+
+  .heatmap-0 { @apply bg-stone-100; }
+  .heatmap-1 { @apply bg-emerald-100; }
+  .heatmap-2 { @apply bg-emerald-200; }
+  .heatmap-3 { @apply bg-emerald-300; }
+  .heatmap-4 { @apply bg-emerald-400; }
+  .heatmap-5 { @apply bg-emerald-500; }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

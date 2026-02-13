@@ -1,0 +1,16 @@
+node_modules/
+.next/
+dist/
+.env
+.env.local
+.env.production
+*.log
+.DS_Store
+.expo/
+android/
+ios/
+__pycache__/
+*.pyc
+.venv/
+coverage/
+.turbo/

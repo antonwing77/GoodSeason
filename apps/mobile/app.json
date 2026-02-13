@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "SeasonScope",
+    "slug": "seasonscope",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "seasonscope",
+    "splash": {
+      "backgroundColor": "#f0f9f4",
+      "resizeMode": "contain"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.seasonscope.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#f0f9f4"
+      },
+      "package": "com.seasonscope.app"
+    },
+    "plugins": ["expo-router", "expo-location"]
+  }
+}
