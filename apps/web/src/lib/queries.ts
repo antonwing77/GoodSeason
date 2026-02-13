@@ -3,7 +3,7 @@ import type {
   Food, GhgFactor, Seasonality, Source, WaterRisk,
   FoodCardData, SearchResult, QualityScore, WaterRiskBucket,
 } from '@seasonscope/shared';
-import { selectBestFactor, isHeatedGreenhouseLikely } from '@seasonscope/shared';
+import { selectBestFactor, isHeatedGreenhouseLikely, selectSeasonalityRecord } from '@seasonscope/shared';
 
 // ── Food Queries ────────────────────────────────────────────────
 
@@ -53,27 +53,25 @@ export async function searchFoods(term: string, limit: number = 10): Promise<Sea
 export async function getGhgFactors(foodId: string): Promise<GhgFactor[]> {
   return cachedQuery<GhgFactor>(
     `ghg:${foodId}`,
-    'SELECT * FROM ghg_factors WHERE food_id = $1',
+    `SELECT * FROM ghg_factors WHERE food_id = $1 AND source_id IS NOT NULL
+     AND value_min IS NOT NULL AND value_mid IS NOT NULL AND value_max IS NOT NULL`,
     [foodId],
     300_000
   );
 }
 
-export async function getBestGhgFactor(foodId: string, regionCode: string) {
+export async function getBestGhgFactor(foodId: string, regionCode: string, explicitSystemCode?: string) {
   const factors = await getGhgFactors(foodId);
-  return selectBestFactor(factors, regionCode);
+  return selectBestFactor(factors, regionCode, explicitSystemCode);
 }
 
 // ── Seasonality Queries ─────────────────────────────────────────
 
-export async function getSeasonality(
-  foodId: string,
-  regionCode: string
-): Promise<Seasonality[]> {
+export async function getSeasonality(foodId: string): Promise<Seasonality[]> {
   return cachedQuery<Seasonality>(
-    `season:${foodId}:${regionCode}`,
-    'SELECT * FROM seasonality WHERE food_id = $1 AND region_code = $2 ORDER BY month',
-    [foodId, regionCode],
+    `season:${foodId}`,
+    'SELECT * FROM seasonality WHERE food_id = $1 AND source_id IS NOT NULL ORDER BY month',
+    [foodId],
     300_000
   );
 }
@@ -134,15 +132,18 @@ export async function buildFoodCardData(
   regionCode: string,
   month: number,
   climateZone: string = '',
-  latitude: number = 0
+  latitude: number = 0,
+  longitude: number = 0,
+  systemCode?: string,
 ): Promise<FoodCardData> {
   const [factorResult, seasonality, waterRisk] = await Promise.all([
-    getBestGhgFactor(food.id, regionCode),
-    getSeasonality(food.id, regionCode),
+    getBestGhgFactor(food.id, regionCode, systemCode),
+    getSeasonality(food.id),
     getWaterRisk(regionCode),
   ]);
 
-  const monthSeason = seasonality.find((s) => s.month === month) ?? null;
+  const seasonalitySelection = selectSeasonalityRecord(seasonality, regionCode, month, latitude, longitude);
+  const monthSeason = seasonalitySelection.record;
 
   const ghg = factorResult
     ? {
@@ -151,6 +152,8 @@ export async function buildFoodCardData(
         value_max: factorResult.factor.value_max,
         unit: factorResult.factor.unit,
         quality_score: factorResult.quality,
+        resolution: factorResult.resolution,
+        selection_explanation: factorResult.explanation,
         source_ids: [factorResult.factor.source_id],
       }
     : {
@@ -159,17 +162,22 @@ export async function buildFoodCardData(
         value_max: 0,
         unit: 'kg CO2e / kg food',
         quality_score: 'low' as QualityScore,
+        resolution: 'global' as const,
+        selection_explanation: 'No cited factor available for this item/location.',
         source_ids: [],
       };
 
+  const ghgDisplayable = ghg.source_ids.length > 0;
+
   return {
     food,
-    ghg,
+    ghg: ghgDisplayable ? ghg : { ...ghg, value_min: 0, value_mid: 0, value_max: 0 },
     seasonality: monthSeason
       ? {
           in_season_probability: monthSeason.in_season_probability,
           confidence: monthSeason.confidence,
           source_id: monthSeason.source_id,
+          fallback_note: seasonalitySelection.fallback_note,
         }
       : null,
     water_risk: waterRisk
@@ -192,11 +200,12 @@ export async function getMonthlyRecommendations(
   month: number,
   climateZone: string = '',
   latitude: number = 0,
+  longitude: number = 0,
   limit: number = 20
 ) {
-  const foods = await getFoods(undefined, 200);
+  const foods = await getFoods(undefined, 500);
   const cards = await Promise.all(
-    foods.map((f) => buildFoodCardData(f, regionCode, month, climateZone, latitude))
+    foods.map((f) => buildFoodCardData(f, regionCode, month, climateZone, latitude, longitude))
   );
 
   // In-season

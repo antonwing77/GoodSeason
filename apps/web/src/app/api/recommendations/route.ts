@@ -7,6 +7,7 @@ export async function GET(request: NextRequest) {
   const month = Number(searchParams.get('month') || new Date().getMonth() + 1);
   const climateZone = searchParams.get('climate_zone') || '';
   const latitude = Number(searchParams.get('latitude') || '40');
+  const longitude = Number(searchParams.get('longitude') || '-100');
 
   try {
     const recommendations = await getMonthlyRecommendations(
@@ -14,6 +15,7 @@ export async function GET(request: NextRequest) {
       month,
       climateZone,
       latitude,
+      longitude,
       20
     );
 

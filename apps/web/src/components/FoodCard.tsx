@@ -16,12 +16,12 @@ export function FoodCard({ data, showCategory = true }: FoodCardProps) {
   const displayName = food.canonical_name.replace(/_/g, ' ');
 
   const co2eDisplay =
-    ghg.value_mid > 0
+    ghg.value_mid > 0 && ghg.source_ids.length > 0
       ? `${ghg.value_mid.toFixed(1)} kg CO₂e/kg`
-      : 'No data';
+      : 'Cited data unavailable';
 
   const co2eRange =
-    ghg.value_min > 0 && ghg.value_max > 0
+    ghg.value_min > 0 && ghg.value_max > 0 && ghg.source_ids.length > 0
       ? `${ghg.value_min.toFixed(1)}–${ghg.value_max.toFixed(1)}`
       : null;
 
@@ -54,7 +54,7 @@ export function FoodCard({ data, showCategory = true }: FoodCardProps) {
         <div className="flex items-center gap-2 mb-2">
           <BarChart3 size={14} className="text-stone-400" />
           <span className="text-sm font-medium text-stone-700">{co2eDisplay}</span>
-          {ghg.value_mid > 0 && (
+          {ghg.value_mid > 0 && ghg.source_ids.length > 0 && (
             <Badge variant={getCo2eBadgeVariant(ghg.value_mid)} />
           )}
         </div>

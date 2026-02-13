@@ -13,7 +13,7 @@ import { ArrowLeft, BarChart3, Info, Scale, ChevronDown, Lightbulb } from 'lucid
 
 interface FoodDetailData {
   card: FoodCardData;
-  seasonality: { month: number; probability: number }[];
+  seasonality: { month: number; probability: number; confidence?: number; source_id?: string | null; fallback_note?: string }[];
   sources: {
     id: string;
     title: string;
@@ -35,7 +35,11 @@ export default function FoodDetailPage() {
   const [showExplanation, setShowExplanation] = useState(false);
 
   useEffect(() => {
-    const location = localStorage.getItem('seasonscope_location') || 'US';
+    const context = localStorage.getItem('seasonscope_location_context');
+    const parsed = context ? JSON.parse(context) : { country_code: 'US', admin_region: '' };
+    const location = parsed.country_code === 'US' && parsed.admin_region
+      ? `US-${parsed.admin_region}`
+      : parsed.country_code;
     const month = new Date().getMonth() + 1;
 
     // Fetch food detail + recommendations for alternatives
@@ -99,6 +103,7 @@ export default function FoodDetailPage() {
   }
 
   const { card, seasonality, sources, alternatives } = data;
+  const hasCitedGhg = card.ghg.source_ids.length > 0 && card.ghg.value_mid > 0;
   const displayName = card.food.canonical_name.replace(/_/g, ' ');
   const currentMonth = new Date().getMonth() + 1;
 
@@ -152,22 +157,24 @@ export default function FoodDetailPage() {
 
                 <div className="flex items-baseline gap-3 mb-3">
                   <span className="text-3xl font-bold text-stone-900">
-                    {card.ghg.value_mid.toFixed(1)}
+                    {hasCitedGhg ? card.ghg.value_mid.toFixed(1) : '—'}
                   </span>
                   <span className="text-sm text-stone-500">
                     {card.ghg.unit}
                   </span>
-                  <Badge variant={getCo2eBadgeVariant(card.ghg.value_mid)} />
+                  {hasCitedGhg ? <Badge variant={getCo2eBadgeVariant(card.ghg.value_mid)} /> : null}
                 </div>
 
-                <div className="flex items-center gap-4 text-sm text-stone-500 mb-4">
+                <div className="flex items-center gap-4 text-sm text-stone-500 mb-4 flex-wrap">
                   <span>
-                    Range: {card.ghg.value_min.toFixed(1)} – {card.ghg.value_max.toFixed(1)} {card.ghg.unit}
+                    {hasCitedGhg ? `Range: ${card.ghg.value_min.toFixed(1)} – ${card.ghg.value_max.toFixed(1)} ${card.ghg.unit}` : 'No cited numeric GHG factor available.'}
                   </span>
                   <Badge variant={`quality_${card.ghg.quality_score}` as any} />
                 </div>
 
-                {card.food.typical_serving_g > 0 && card.ghg.value_mid > 0 && (
+                <p className="text-xs text-stone-500 mb-3">{card.ghg.selection_explanation}</p>
+
+                {card.food.typical_serving_g > 0 && hasCitedGhg && (
                   <p className="text-sm text-stone-400">
                     Per serving ({card.food.typical_serving_g}g):{' '}
                     <span className="font-medium text-stone-600">
@@ -196,6 +203,9 @@ export default function FoodDetailPage() {
               {/* Season calendar */}
               {seasonality.length > 0 && (
                 <div className="rounded-2xl bg-white border border-stone-200/60 shadow-sm p-6">
+                  {card.seasonality?.fallback_note && (
+                    <p className="text-xs text-stone-500 mb-3">{card.seasonality.fallback_note}</p>
+                  )}
                   <SeasonCalendar
                     data={seasonality}
                     currentMonth={currentMonth}

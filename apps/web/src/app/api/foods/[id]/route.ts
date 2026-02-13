@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFoodById, buildFoodCardData, getSeasonality, getSources, getGhgFactors } from '@/lib/queries';
-import { estimateClimateZone } from '@seasonscope/shared';
+import { estimateClimateZone, selectSeasonalityRecord } from '@seasonscope/shared';
 
 export async function GET(
   request: NextRequest,
@@ -21,8 +21,8 @@ export async function GET(
     }
 
     const [card, seasonalityRecords, ghgFactors] = await Promise.all([
-      buildFoodCardData(food, region, month, climateZone, latitude),
-      getSeasonality(foodId, region),
+      buildFoodCardData(food, region, month, climateZone, latitude, longitude),
+      getSeasonality(foodId),
       getGhgFactors(foodId),
     ]);
 
@@ -35,10 +35,17 @@ export async function GET(
 
     const sources = await getSources([...sourceIds]);
 
-    const seasonality = seasonalityRecords.map((s) => ({
-      month: s.month,
-      probability: s.in_season_probability,
-    }));
+    const seasonality = Array.from({ length: 12 }, (_, idx) => {
+      const monthNumber = idx + 1;
+      const selected = selectSeasonalityRecord(seasonalityRecords, region, monthNumber, latitude, longitude);
+      return {
+        month: monthNumber,
+        probability: selected.record?.in_season_probability ?? 0,
+        confidence: selected.record?.confidence ?? 0,
+        source_id: selected.record?.source_id ?? null,
+        fallback_note: selected.fallback_note,
+      };
+    });
 
     return NextResponse.json(
       { card, seasonality, sources },

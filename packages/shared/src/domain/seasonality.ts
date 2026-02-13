@@ -1,4 +1,5 @@
 import type { Seasonality, FoodCardData } from '../types';
+import { estimateClimateZone } from './location';
 
 /**
  * Determines if heated-greenhouse production is likely for a given food/region/month.
@@ -99,4 +100,72 @@ export function getMonthName(month: number): string {
     'July', 'August', 'September', 'October', 'November', 'December',
   ];
   return months[(month - 1) % 12];
+}
+
+const US_REGION_FALLBACKS: Record<string, string> = {
+  AL: 'US-SE', AR: 'US-SE', FL: 'US-SE', GA: 'US-SE', KY: 'US-SE', LA: 'US-SE',
+  MS: 'US-SE', NC: 'US-SE', SC: 'US-SE', TN: 'US-SE', VA: 'US-SE', WV: 'US-SE',
+  CA: 'US-W', OR: 'US-W', WA: 'US-W', NV: 'US-W', AZ: 'US-W', UT: 'US-W', CO: 'US-W',
+  NY: 'US-NE', MA: 'US-NE', VT: 'US-NE', NH: 'US-NE', ME: 'US-NE', RI: 'US-NE', CT: 'US-NE', NJ: 'US-NE', PA: 'US-NE',
+  IL: 'US-MW', IN: 'US-MW', IA: 'US-MW', KS: 'US-MW', MI: 'US-MW', MN: 'US-MW', MO: 'US-MW', NE: 'US-MW', ND: 'US-MW', OH: 'US-MW', SD: 'US-MW', WI: 'US-MW',
+  TX: 'US-SW', NM: 'US-SW', OK: 'US-SW',
+};
+
+interface SeasonalitySelection {
+  record: Seasonality | null;
+  fallback_note?: string;
+}
+
+export function selectSeasonalityRecord(
+  records: Seasonality[],
+  regionCode: string,
+  month: number,
+  lat?: number,
+  lon?: number
+): SeasonalitySelection {
+  const map = new Map(records.map((r) => [`${r.region_code}:${r.month}`, r]));
+  const normalizedRegion = regionCode.toUpperCase();
+  const countryCode = normalizedRegion.split('-')[0];
+
+  const exact = map.get(`${normalizedRegion}:${month}`);
+  if (exact) return { record: exact };
+
+  if (normalizedRegion.startsWith('US-')) {
+    const state = normalizedRegion.replace('US-', '');
+    const fallbackRegion = US_REGION_FALLBACKS[state];
+    if (fallbackRegion) {
+      const usRegional = map.get(`${fallbackRegion}:${month}`);
+      if (usRegional) {
+        return {
+          record: usRegional,
+          fallback_note: `Using ${fallbackRegion.replace('US-', '')} US region fallback (state-level calendar unavailable).`,
+        };
+      }
+    }
+  }
+
+  const country = map.get(`${countryCode}:${month}`);
+  if (country) {
+    return {
+      record: country,
+      fallback_note: `Using ${countryCode} country-level seasonality fallback.`,
+    };
+  }
+
+  if (typeof lat === 'number' && typeof lon === 'number') {
+    const climate = estimateClimateZone(lat, lon);
+    const climateRecord = map.get(`CLIMATE:${climate}:${month}`);
+    if (climateRecord) {
+      return {
+        record: climateRecord,
+        fallback_note: `Using climate-zone fallback (${climate}) for this location.`,
+      };
+    }
+  }
+
+  const global = map.get(`GLOBAL:${month}`) ?? null;
+  return {
+    record: global,
+    fallback_note: global ? 'Using global seasonality baseline.' : 'No seasonality data with citation for this month/location.',
+  };
 }

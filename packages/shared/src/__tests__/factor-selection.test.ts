@@ -34,6 +34,7 @@ describe('selectBestFactor', () => {
     expect(result!.resolution).toBe('region');
     expect(result!.factor.region_code).toBe('US');
     expect(result!.factor.value_mid).toBe(1.2);
+    expect(result!.explanation).toContain('US-specific');
   });
 
   it('falls back to continent when region not available', () => {
@@ -75,9 +76,16 @@ describe('selectBestFactor', () => {
       makeFactor({ id: 'eu', region_code: 'EU', value_mid: 1.3 }),
     ];
     const result = selectBestFactor(factors, 'AU');
-    expect(result).not.toBeNull();
-    expect(result!.resolution).toBe('global');
-    expect(result!.quality).toBe('low');
+    expect(result).toBeNull();
+  });
+
+  it('does not select non-baseline system factors unless explicitly requested', () => {
+    const factors = [
+      makeFactor({ id: 'heated', region_code: 'US', system_code: 'heated_greenhouse' }),
+      makeFactor({ id: 'global', region_code: 'GLOBAL', system_code: 'unknown' }),
+    ];
+    const result = selectBestFactor(factors, 'US');
+    expect(result?.factor.id).toBe('global');
   });
 
   it('is case-insensitive for region codes', () => {

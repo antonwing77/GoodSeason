@@ -4,6 +4,7 @@ import {
   getBestMonths,
   rankForMonth,
   getMonthName,
+  selectSeasonalityRecord,
 } from '../domain/seasonality';
 import type { Seasonality, FoodCardData } from '../types';
 
@@ -97,6 +98,8 @@ describe('rankForMonth', () => {
       value_max: co2e * 2,
       unit: 'kg CO2e / kg food',
       quality_score: 'medium',
+      resolution: 'global',
+      selection_explanation: 'test',
       source_ids: ['s1'],
     },
     seasonality: seasonProb !== null
@@ -134,5 +137,19 @@ describe('getMonthName', () => {
     expect(getMonthName(1)).toBe('January');
     expect(getMonthName(6)).toBe('June');
     expect(getMonthName(12)).toBe('December');
+  });
+});
+
+describe('selectSeasonalityRecord', () => {
+  const records: Seasonality[] = [
+    { id: '1', food_id: 'tomato', region_code: 'US-SE', month: 1, in_season_probability: 0.5, confidence: 0.8, source_id: 's' },
+    { id: '2', food_id: 'tomato', region_code: 'US', month: 1, in_season_probability: 0.4, confidence: 0.8, source_id: 's' },
+    { id: '3', food_id: 'tomato', region_code: 'CLIMATE:Dfb', month: 1, in_season_probability: 0.3, confidence: 0.6, source_id: 's' },
+  ];
+
+  it('uses US state fallback note when state record missing', () => {
+    const selected = selectSeasonalityRecord(records, 'US-FL', 1);
+    expect(selected.record?.region_code).toBe('US-SE');
+    expect(selected.fallback_note).toContain('US region fallback');
   });
 });

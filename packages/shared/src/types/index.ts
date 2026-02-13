@@ -93,12 +93,15 @@ export interface FoodCardData {
     value_max: number;
     unit: string;
     quality_score: QualityScore;
+    resolution: 'region' | 'continent' | 'global';
+    selection_explanation: string;
     source_ids: string[];
   };
   seasonality: {
     in_season_probability: number;
     confidence: number;
     source_id: string;
+    fallback_note?: string;
   } | null;
   water_risk: {
     bucket: WaterRiskBucket;

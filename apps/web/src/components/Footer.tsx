@@ -9,7 +9,7 @@ export function Footer() {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-stone-500">
             <Leaf size={16} className="text-emerald-600" />
-            <span className="text-sm font-medium">SeasonScope</span>
+            <span className="text-sm font-medium">GoodSeason</span>
             <span className="text-xs text-stone-400">
               &mdash; Guidance, not gospel. Always verify data.
             </span>

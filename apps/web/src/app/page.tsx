@@ -30,25 +30,31 @@ export default function HomePage() {
   const [recommendations, setRecommendations] = useState<Recommendations | null>(null);
   const [loading, setLoading] = useState(true);
   const [location, setLocation] = useState('US');
+  const [adminRegion, setAdminRegion] = useState('');
   const [month] = useState(new Date().getMonth() + 1);
   const [dietFilter, setDietFilter] = useState<'all' | 'vegetarian' | 'vegan'>('all');
   const [avoidHighWater, setAvoidHighWater] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem('seasonscope_location');
-    if (stored) setLocation(stored);
+    const stored = localStorage.getItem('seasonscope_location_context');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      setLocation(parsed.country_code || 'US');
+      setAdminRegion(parsed.admin_region || '');
+    }
   }, []);
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/recommendations?region=${location}&month=${month}`)
+    const regionCode = location === 'US' && adminRegion ? `US-${adminRegion}` : location;
+    fetch(`/api/recommendations?region=${regionCode}&month=${month}`)
       .then((res) => res.json())
       .then((data) => {
         setRecommendations(data);
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [location, month]);
+  }, [location, adminRegion, month]);
 
   const filterItems = (items: FoodCardData[]): FoodCardData[] => {
     let filtered = items;
@@ -89,7 +95,7 @@ export default function HomePage() {
           <div className="rounded-3xl bg-gradient-to-br from-emerald-50 via-white to-stone-50 border border-emerald-100/60 p-6 sm:p-10">
             <div className="flex items-center gap-2 text-sm text-emerald-700 mb-2">
               <MapPin size={14} />
-              <span className="font-medium">{location}</span>
+              <span className="font-medium">{location}{adminRegion ? `-${adminRegion}` : ''}</span>
               <span className="text-emerald-500">&middot;</span>
               <span>{getMonthName(month)}</span>
             </div>

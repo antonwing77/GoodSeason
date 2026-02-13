@@ -1,18 +1,6 @@
 import type { GhgFactor, QualityScore } from '../types';
 
-/**
- * Factor selection logic: picks the best GHG factor for a given food + user region.
- *
- * Priority:
- *   1) Region-specific (user country/admin region)
- *   2) Continent-level
- *   3) Global average
- *
- * Returns the selected factor and the resolution path taken.
- */
-
 const CONTINENT_MAP: Record<string, string> = {
-  // Map country codes to continent codes
   US: 'NA', CA: 'NA', MX: 'NA',
   GB: 'EU', FR: 'EU', DE: 'EU', IT: 'EU', ES: 'EU', NL: 'EU', BE: 'EU',
   SE: 'EU', NO: 'EU', DK: 'EU', FI: 'EU', PL: 'EU', PT: 'EU', AT: 'EU',
@@ -30,59 +18,77 @@ export interface FactorSelection {
   factor: GhgFactor;
   resolution: ResolutionLevel;
   quality: QualityScore;
+  explanation: string;
+}
+
+function isSystemCodeAllowed(factor: GhgFactor, explicitSystemCode?: string): boolean {
+  if (factor.system_code === 'unknown' || factor.system_code === 'baseline') return true;
+  if (!explicitSystemCode) return false;
+  return factor.system_code === explicitSystemCode;
+}
+
+function elevateQuality(quality: QualityScore, resolution: ResolutionLevel): QualityScore {
+  if (resolution === 'global' && quality === 'high') return 'medium';
+  return quality;
 }
 
 export function selectBestFactor(
   factors: GhgFactor[],
-  userRegionCode: string
+  userRegionCode: string,
+  explicitSystemCode?: string
 ): FactorSelection | null {
   if (factors.length === 0) return null;
 
-  // 1) Try exact region match
-  const regionMatch = factors.find(
-    (f) => f.region_code.toUpperCase() === userRegionCode.toUpperCase()
-  );
+  const normalizedRegion = userRegionCode.toUpperCase();
+  const countryCode = normalizedRegion.split('-')[0];
+
+  const validFactors = factors.filter((f) => !!f.source_id && isSystemCodeAllowed(f, explicitSystemCode));
+  if (!validFactors.length) return null;
+
+  const regionMatch = validFactors.find((f) => f.region_code.toUpperCase() === normalizedRegion);
   if (regionMatch) {
     return {
       factor: regionMatch,
       resolution: 'region',
-      quality: regionMatch.quality_score,
+      quality: elevateQuality(regionMatch.quality_score, 'region'),
+      explanation: `Using ${normalizedRegion}-specific factor backed by source ${regionMatch.source_id}.`,
     };
   }
 
-  // 2) Try continent match
-  const continent = CONTINENT_MAP[userRegionCode.toUpperCase()];
+  const countryMatch = validFactors.find((f) => f.region_code.toUpperCase() === countryCode);
+  if (countryMatch) {
+    return {
+      factor: countryMatch,
+      resolution: 'region',
+      quality: elevateQuality(countryMatch.quality_score, 'region'),
+      explanation: `No admin-region factor found; using ${countryCode}-level factor from ${countryMatch.source_id}.`,
+    };
+  }
+
+  const continent = CONTINENT_MAP[countryCode];
   if (continent) {
-    const continentMatch = factors.find(
-      (f) => f.region_code.toUpperCase() === continent
-    );
+    const continentMatch = validFactors.find((f) => f.region_code.toUpperCase() === continent);
     if (continentMatch) {
       return {
         factor: continentMatch,
         resolution: 'continent',
-        quality: continentMatch.quality_score,
+        quality: elevateQuality(continentMatch.quality_score, 'continent'),
+        explanation: `No country-specific factor found; using ${continent} continent average (${continentMatch.source_id}).`,
       };
     }
   }
 
-  // 3) Fall back to global average
-  const globalMatch = factors.find(
-    (f) => f.region_code.toUpperCase() === 'GLOBAL'
-  );
+  const globalMatch = validFactors.find((f) => f.region_code.toUpperCase() === 'GLOBAL');
   if (globalMatch) {
     return {
       factor: globalMatch,
       resolution: 'global',
-      quality: globalMatch.quality_score,
+      quality: elevateQuality(globalMatch.quality_score, 'global'),
+      explanation: `Falling back to global baseline from ${globalMatch.source_id}; uncertainty may be higher for your location.`,
     };
   }
 
-  // Last resort: return first factor
-  return {
-    factor: factors[0],
-    resolution: 'global',
-    quality: 'low',
-  };
+  return null;
 }
 
 export function getContinentForCountry(countryCode: string): string | null {

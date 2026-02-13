@@ -19,6 +19,7 @@ export function Navbar() {
   >([]);
   const [showResults, setShowResults] = useState(false);
   const [location, setLocation] = useState('');
+  const [adminRegion, setAdminRegion] = useState('');
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
@@ -27,9 +28,11 @@ export function Navbar() {
   // Detect user location on mount
   useEffect(() => {
     // Try to get stored location
-    const stored = localStorage.getItem('seasonscope_location');
+    const stored = localStorage.getItem('seasonscope_location_context');
     if (stored) {
-      setLocation(stored);
+      const parsed = JSON.parse(stored);
+      setLocation(parsed.country_code ?? 'US');
+      setAdminRegion(parsed.admin_region ?? '');
     } else if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
@@ -39,8 +42,10 @@ export function Navbar() {
             );
             const data = await res.json();
             const loc = data.countryCode || 'US';
+            const admin = data.principalSubdivisionCode?.replace(`${loc}-`, '') || '';
             setLocation(loc);
-            localStorage.setItem('seasonscope_location', loc);
+            setAdminRegion(admin);
+            localStorage.setItem('seasonscope_location_context', JSON.stringify({ country_code: loc, admin_region: admin }));
           } catch {
             setLocation('US');
           }
@@ -99,7 +104,7 @@ export function Navbar() {
           <Link href="/" className="flex items-center gap-2 flex-shrink-0">
             <Leaf size={24} className="text-emerald-600" />
             <span className="text-lg font-bold text-stone-900 hidden sm:block">
-              SeasonScope
+              GoodSeason
             </span>
           </Link>
 
@@ -151,12 +156,26 @@ export function Navbar() {
                 value={location}
                 onChange={(e) => {
                   setLocation(e.target.value.toUpperCase());
-                  localStorage.setItem('seasonscope_location', e.target.value.toUpperCase());
+                  localStorage.setItem('seasonscope_location_context', JSON.stringify({ country_code: e.target.value.toUpperCase(), admin_region: adminRegion }));
                 }}
                 className="w-12 bg-transparent text-stone-700 font-medium focus:outline-none"
                 placeholder="US"
                 maxLength={5}
                 aria-label="Country code"
+              />
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-2 bg-stone-100/80 rounded-lg text-sm">
+              <input
+                type="text"
+                value={adminRegion}
+                onChange={(e) => {
+                  setAdminRegion(e.target.value.toUpperCase());
+                  localStorage.setItem('seasonscope_location_context', JSON.stringify({ country_code: location, admin_region: e.target.value.toUpperCase() }));
+                }}
+                className="w-16 bg-transparent text-stone-700 font-medium focus:outline-none"
+                placeholder="State"
+                maxLength={6}
+                aria-label="State or admin region"
               />
             </div>
 
@@ -220,12 +239,26 @@ export function Navbar() {
                   value={location}
                   onChange={(e) => {
                     setLocation(e.target.value.toUpperCase());
-                    localStorage.setItem('seasonscope_location', e.target.value.toUpperCase());
+                    localStorage.setItem('seasonscope_location_context', JSON.stringify({ country_code: e.target.value.toUpperCase(), admin_region: adminRegion }));
                   }}
                   className="w-full bg-transparent text-stone-700 font-medium focus:outline-none"
                   placeholder="Country code"
                   maxLength={5}
                   aria-label="Country code"
+                />
+              </div>
+              <div className="flex items-center gap-1.5 px-3 py-2 bg-stone-100/80 rounded-lg text-sm flex-1">
+                <input
+                  type="text"
+                  value={adminRegion}
+                  onChange={(e) => {
+                    setAdminRegion(e.target.value.toUpperCase());
+                    localStorage.setItem('seasonscope_location_context', JSON.stringify({ country_code: location, admin_region: e.target.value.toUpperCase() }));
+                  }}
+                  className="w-full bg-transparent text-stone-700 font-medium focus:outline-none"
+                  placeholder="State"
+                  maxLength={6}
+                  aria-label="State or admin region"
                 />
               </div>
               <div className="flex items-center gap-1.5 px-3 py-2 bg-stone-100/80 rounded-lg text-sm flex-1">

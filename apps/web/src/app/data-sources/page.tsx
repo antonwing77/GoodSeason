@@ -13,7 +13,7 @@ export default function DataSourcesPage() {
             Data Sources & Methodology
           </h1>
           <p className="text-stone-500 mb-8">
-            SeasonScope is committed to transparency. Every data point shown in the app
+            GoodSeason is committed to transparency. Every data point shown in the app
             is backed by cited sources. This page explains our methodology, data sources,
             and known limitations.
           </p>

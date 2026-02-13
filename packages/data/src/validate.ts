@@ -25,8 +25,8 @@ async function validate(): Promise<ValidationResult[]> {
     const fc = Number(foodCount.rows[0].cnt);
     results.push({
       check: 'food_count',
-      status: fc >= 190 ? 'pass' : fc >= 100 ? 'warn' : 'fail',
-      message: `Found ${fc} foods (target: 190+)`,
+      status: fc >= 350 ? 'pass' : 'fail',
+      message: `Found ${fc} foods (target: 350+)`,
       count: fc,
     });
 
@@ -39,7 +39,7 @@ async function validate(): Promise<ValidationResult[]> {
     `);
     results.push({
       check: 'ghg_coverage',
-      status: foodsWithoutGhg.rowCount === 0 ? 'pass' : 'warn',
+      status: foodsWithoutGhg.rowCount === 0 ? 'pass' : 'fail',
       message: `${foodsWithoutGhg.rowCount} foods missing GHG factors`,
       count: foodsWithoutGhg.rowCount ?? 0,
     });
@@ -78,7 +78,7 @@ async function validate(): Promise<ValidationResult[]> {
       count: outliers.rowCount ?? 0,
     });
 
-    // 6. Check source citations exist
+    // 6. Check source citations exist and are required for displayability
     const missingSourcesGhg = await client.query(`
       SELECT COUNT(*) as cnt FROM ghg_factors g
       LEFT JOIN sources s ON s.id = g.source_id
@@ -101,6 +101,18 @@ async function validate(): Promise<ValidationResult[]> {
       message: `${missingSourcesSeason.rows[0].cnt} seasonality records referencing missing sources`,
     });
 
+    const foodsWithoutCitedGhg = await client.query(`
+      SELECT COUNT(*) as cnt
+      FROM foods f
+      LEFT JOIN ghg_factors g ON g.food_id = f.id AND g.source_id IS NOT NULL
+      WHERE g.id IS NULL
+    `);
+    results.push({
+      check: 'no_citation_not_displayable',
+      status: Number(foodsWithoutCitedGhg.rows[0].cnt) === 0 ? 'pass' : 'fail',
+      message: `${foodsWithoutCitedGhg.rows[0].cnt} foods lack any cited numeric GHG factor`,
+    });
+
     // 7. Check seasonality probabilities in range
     const badProbability = await client.query(`
       SELECT COUNT(*) as cnt FROM seasonality
@@ -121,7 +133,7 @@ async function validate(): Promise<ValidationResult[]> {
     `);
     results.push({
       check: 'produce_seasonality_coverage',
-      status: Number(produceWithoutSeason.rows[0].cnt) === 0 ? 'pass' : 'warn',
+      status: Number(produceWithoutSeason.rows[0].cnt) === 0 ? 'pass' : 'fail',
       message: `${produceWithoutSeason.rows[0].cnt} produce items missing seasonality data`,
     });
 
@@ -146,7 +158,13 @@ async function validate(): Promise<ValidationResult[]> {
     }
     results.push({
       check: 'category_distribution',
-      status: 'pass',
+      status:
+        (categories.produce ?? 0) >= 200 &&
+        (categories.meat ?? 0) >= 60 &&
+        (categories.dairy ?? 0) >= 60 &&
+        ((categories.grains ?? 0) + (categories.legumes ?? 0)) >= 30
+          ? 'pass'
+          : 'fail',
       message: `Distribution: ${Object.entries(categories).map(([k, v]) => `${k}=${v}`).join(', ')}`,
     });
 
