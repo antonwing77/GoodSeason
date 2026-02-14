@@ -18,48 +18,87 @@ import path from 'path';
 
 dotenv.config({ path: '../../.env' });
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
-});
+async function waitForDatabase(maxRetries: number = 5): Promise<Pool> {
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
+  });
+
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const client = await pool.connect();
+      await client.query('SELECT 1');
+      client.release();
+      console.log('  Database connection established.');
+      return pool;
+    } catch (err) {
+      console.log(`  Database not ready (attempt ${i + 1}/${maxRetries}). Retrying in ${2 ** i}s...`);
+      await new Promise((resolve) => setTimeout(resolve, 2 ** i * 1000));
+    }
+  }
+
+  throw new Error('Could not connect to database after retries.');
+}
+
+function resolveTsx(): string {
+  // Use tsx from node_modules/.bin (available in npm script PATH)
+  // Fall back to npx tsx if not in PATH
+  try {
+    execSync('tsx --version', { stdio: 'ignore' });
+    return 'tsx';
+  } catch {
+    return 'npx tsx';
+  }
+}
 
 async function etl() {
   console.log('=== GoodSeason ETL Pipeline ===\n');
 
+  if (!process.env.DATABASE_URL) {
+    console.error('ERROR: DATABASE_URL is not set. Cannot run ETL.');
+    process.exit(1);
+  }
+
+  console.log('Connecting to database...');
+  const pool = await waitForDatabase();
+
   const scriptsDir = path.resolve(__dirname);
   const cwd = path.resolve(__dirname, '..');
+  const tsxCmd = resolveTsx();
+
+  console.log(`  Using: ${tsxCmd}\n`);
 
   // Step 1: Migrate
   console.log('Step 1: Running migrations...');
   try {
-    execSync(`npx tsx ${path.join(scriptsDir, 'migrate.ts')}`, {
+    execSync(`${tsxCmd} ${path.join(scriptsDir, 'migrate.ts')}`, {
       stdio: 'inherit',
       cwd,
       env: process.env,
     });
     console.log('  Migrations complete.\n');
   } catch (err) {
-    console.error('  Migration failed. Aborting ETL.');
+    console.error('  Migration failed. Aborting ETL.', err);
     process.exit(1);
   }
 
   // Step 2: Seed
   console.log('Step 2: Seeding data...');
   try {
-    execSync(`npx tsx ${path.join(scriptsDir, 'seed.ts')}`, {
+    execSync(`${tsxCmd} ${path.join(scriptsDir, 'seed.ts')}`, {
       stdio: 'inherit',
       cwd,
       env: process.env,
     });
     console.log('  Seeding complete.\n');
   } catch (err) {
-    console.error('  Seeding failed. Continuing to connectors...');
+    console.error('  Seeding failed. Continuing to connectors...', err);
   }
 
   // Step 3: Run dataset connectors
   console.log('Step 3: Running dataset connectors...');
   try {
-    execSync(`npx tsx ${path.join(scriptsDir, 'connectors/index.ts')}`, {
+    execSync(`${tsxCmd} ${path.join(scriptsDir, 'connectors/index.ts')}`, {
       stdio: 'inherit',
       cwd,
       env: process.env,
@@ -90,7 +129,7 @@ async function etl() {
   // Step 5: Validate
   console.log('Step 5: Running validation...');
   try {
-    execSync(`npx tsx ${path.join(scriptsDir, 'validate.ts')}`, {
+    execSync(`${tsxCmd} ${path.join(scriptsDir, 'validate.ts')}`, {
       stdio: 'inherit',
       cwd,
       env: process.env,

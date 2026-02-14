@@ -172,9 +172,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_monthly_rec_region_month_food
 `;
 
 async function migrate() {
+  if (!process.env.DATABASE_URL) {
+    console.error('ERROR: DATABASE_URL is not set. Cannot run migration.');
+    process.exit(1);
+  }
+
+  console.log('Running SeasonScope database migration...');
+  console.log(`  DATABASE_URL: ${process.env.DATABASE_URL?.replace(/:[^@]+@/, ':***@')}`);
+  console.log(`  DATABASE_SSL: ${process.env.DATABASE_SSL}`);
+
   const client = await pool.connect();
   try {
-    console.log('Running SeasonScope database migration...');
     await client.query(MIGRATION_SQL);
     console.log('Migration completed successfully.');
   } catch (err) {
