@@ -1,11 +1,12 @@
 /**
- * SeasonScope ETL Pipeline
+ * GoodSeason ETL Pipeline
  *
  * This script orchestrates the data pipeline:
  * 1. Run migrations (create tables if not exist)
  * 2. Seed base data (foods, sources, GHG factors, seasonality, water risk, mappings)
- * 3. Validate data integrity
+ * 3. Run dataset connectors (OWID, AGRIBALYSE, FAO, Köppen, Aqueduct, Comtrade)
  * 4. Refresh materialized views
+ * 5. Validate data integrity
  *
  * Usage: npx tsx src/etl.ts
  */
@@ -23,16 +24,17 @@ const pool = new Pool({
 });
 
 async function etl() {
-  console.log('=== SeasonScope ETL Pipeline ===\n');
+  console.log('=== GoodSeason ETL Pipeline ===\n');
 
   const scriptsDir = path.resolve(__dirname);
+  const cwd = path.resolve(__dirname, '..');
 
   // Step 1: Migrate
   console.log('Step 1: Running migrations...');
   try {
     execSync(`npx tsx ${path.join(scriptsDir, 'migrate.ts')}`, {
       stdio: 'inherit',
-      cwd: path.resolve(__dirname, '..'),
+      cwd,
       env: process.env,
     });
     console.log('  Migrations complete.\n');
@@ -46,16 +48,29 @@ async function etl() {
   try {
     execSync(`npx tsx ${path.join(scriptsDir, 'seed.ts')}`, {
       stdio: 'inherit',
-      cwd: path.resolve(__dirname, '..'),
+      cwd,
       env: process.env,
     });
     console.log('  Seeding complete.\n');
   } catch (err) {
-    console.error('  Seeding failed. Continuing to validation...');
+    console.error('  Seeding failed. Continuing to connectors...');
   }
 
-  // Step 3: Refresh materialized views
-  console.log('Step 3: Refreshing materialized views...');
+  // Step 3: Run dataset connectors
+  console.log('Step 3: Running dataset connectors...');
+  try {
+    execSync(`npx tsx ${path.join(scriptsDir, 'connectors/index.ts')}`, {
+      stdio: 'inherit',
+      cwd,
+      env: process.env,
+    });
+    console.log('  Connectors complete.\n');
+  } catch (err) {
+    console.error('  Some connectors failed (see above). Continuing...');
+  }
+
+  // Step 4: Refresh materialized views
+  console.log('Step 4: Refreshing materialized views...');
   const client = await pool.connect();
   try {
     await client.query('REFRESH MATERIALIZED VIEW CONCURRENTLY monthly_recommendations');
@@ -72,12 +87,12 @@ async function etl() {
     client.release();
   }
 
-  // Step 4: Validate
-  console.log('Step 4: Running validation...');
+  // Step 5: Validate
+  console.log('Step 5: Running validation...');
   try {
     execSync(`npx tsx ${path.join(scriptsDir, 'validate.ts')}`, {
       stdio: 'inherit',
-      cwd: path.resolve(__dirname, '..'),
+      cwd,
       env: process.env,
     });
   } catch (err) {

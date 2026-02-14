@@ -8,6 +8,13 @@
     "seed": "tsx src/seed.ts",
     "etl": "tsx src/etl.ts",
     "validate": "tsx src/validate.ts",
+    "etl:owid": "tsx src/run-owid.ts",
+    "etl:agribalyse": "tsx src/run-agribalyse.ts",
+    "etl:fao": "tsx src/run-fao.ts",
+    "etl:aqueduct": "tsx src/run-aqueduct.ts",
+    "etl:comtrade": "tsx src/run-comtrade.ts",
+    "etl:koppen": "tsx src/run-koppen.ts",
+    "etl:all": "tsx src/connectors/index.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
