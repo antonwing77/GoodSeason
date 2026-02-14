@@ -4,8 +4,6 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['pg'],
   },
-  // Render deployment: use standalone output
-  output: 'standalone',
   // Performance
   poweredByHeader: false,
   compress: true,

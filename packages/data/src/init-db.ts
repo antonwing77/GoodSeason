@@ -12,8 +12,8 @@
 
 import { Pool } from 'pg';
 import * as dotenv from 'dotenv';
-import { execSync } from 'child_process';
-import path from 'path';
+import { runMigrations } from './migrate';
+import { runSeed } from './seed';
 
 dotenv.config({ path: '../../.env' });
 
@@ -23,28 +23,22 @@ async function initDb() {
     process.exit(1);
   }
 
-  const scriptsDir = path.resolve(__dirname);
-  const cwd = path.resolve(__dirname, '..');
-
-  // Step 1: Run migrations (idempotent)
-  console.log('[init-db] Running migrations...');
-  try {
-    execSync(`tsx ${path.join(scriptsDir, 'migrate.ts')}`, {
-      stdio: 'inherit',
-      cwd,
-      env: process.env,
-    });
-  } catch (err) {
-    console.error('[init-db] Migration failed:', err);
-    process.exit(1);
-  }
-
-  // Step 2: Check if data exists
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
   });
 
+  // Step 1: Run migrations (idempotent)
+  console.log('[init-db] Running migrations...');
+  try {
+    await runMigrations(pool);
+  } catch (err) {
+    console.error('[init-db] Migration failed:', err);
+    await pool.end();
+    process.exit(1);
+  }
+
+  // Step 2: Check if data exists
   let needsSeed = false;
   try {
     const result = await pool.query('SELECT COUNT(*)::int AS count FROM foods');
@@ -56,17 +50,12 @@ async function initDb() {
     console.log('[init-db] Could not query foods table. Will attempt seed.');
     needsSeed = true;
   }
-  await pool.end();
 
   // Step 3: Seed if empty
   if (needsSeed) {
     console.log('[init-db] Database is empty. Running seed...');
     try {
-      execSync(`tsx ${path.join(scriptsDir, 'seed.ts')}`, {
-        stdio: 'inherit',
-        cwd,
-        env: process.env,
-      });
+      await runSeed(pool);
       console.log('[init-db] Seed complete.');
     } catch (err) {
       console.error('[init-db] Seed failed:', err);
@@ -76,6 +65,7 @@ async function initDb() {
     console.log('[init-db] Database already populated. Skipping seed.');
   }
 
+  await pool.end();
   console.log('[init-db] Done.');
 }
 

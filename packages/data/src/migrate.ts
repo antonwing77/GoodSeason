@@ -3,11 +3,6 @@ import * as dotenv from 'dotenv';
 
 dotenv.config({ path: '../../.env' });
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
-});
-
 const MIGRATION_SQL = `
 -- ============================================================
 -- SeasonScope Database Schema
@@ -171,11 +166,16 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_monthly_rec_region_month_food
   ON monthly_recommendations (region_code, month, food_id);
 `;
 
-async function migrate() {
+export async function runMigrations(connectionPool?: Pool): Promise<void> {
   if (!process.env.DATABASE_URL) {
-    console.error('ERROR: DATABASE_URL is not set. Cannot run migration.');
-    process.exit(1);
+    throw new Error('DATABASE_URL is not set. Cannot run migration.');
   }
+
+  const pool = connectionPool ?? new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
+  });
+  const ownPool = !connectionPool;
 
   console.log('Running SeasonScope database migration...');
   console.log(`  DATABASE_URL: ${process.env.DATABASE_URL?.replace(/:[^@]+@/, ':***@')}`);
@@ -187,11 +187,16 @@ async function migrate() {
     console.log('Migration completed successfully.');
   } catch (err) {
     console.error('Migration failed:', err);
-    process.exit(1);
+    throw err;
   } finally {
     client.release();
-    await pool.end();
+    if (ownPool) await pool.end();
   }
 }
 
-migrate();
+// Run as standalone script (tsx src/migrate.ts)
+const isMain = process.argv[1]?.replace(/\\/g, '/').endsWith('/migrate.ts') ||
+               process.argv[1]?.replace(/\\/g, '/').endsWith('/migrate.js');
+if (isMain) {
+  runMigrations().catch(() => process.exit(1));
+}

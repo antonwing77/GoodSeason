@@ -3,10 +3,12 @@ import * as dotenv from 'dotenv';
 
 dotenv.config({ path: '../../.env' });
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
-});
+function createPool(): Pool {
+  return new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
+  });
+}
 
 // ============================================================
 // DATA SOURCES
@@ -1367,7 +1369,9 @@ function buildGeneratedFoods(existingFoods: Food[]): Food[] {
 // SEED FUNCTION
 // ============================================================
 
-async function seed() {
+export async function runSeed(connectionPool?: Pool): Promise<void> {
+  const pool = connectionPool ?? createPool();
+  const ownPool = !connectionPool;
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -1514,11 +1518,16 @@ async function seed() {
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Seed failed:', err);
-    process.exit(1);
+    throw err;
   } finally {
     client.release();
-    await pool.end();
+    if (ownPool) await pool.end();
   }
 }
 
-seed();
+// Run as standalone script (tsx src/seed.ts)
+const isMain = process.argv[1]?.replace(/\\/g, '/').endsWith('/seed.ts') ||
+               process.argv[1]?.replace(/\\/g, '/').endsWith('/seed.js');
+if (isMain) {
+  runSeed().catch(() => process.exit(1));
+}
