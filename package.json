@@ -22,7 +22,8 @@
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "db:migrate": "npm run migrate --workspace=packages/data"
+    "db:migrate": "npm run migrate --workspace=packages/data",
+    "db:init": "npm run init-db --workspace=packages/data"
   },
   "devDependencies": {
     "typescript": "^5.4.0"

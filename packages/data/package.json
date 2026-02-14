@@ -15,6 +15,7 @@
     "etl:comtrade": "tsx src/run-comtrade.ts",
     "etl:koppen": "tsx src/run-koppen.ts",
     "etl:all": "tsx src/connectors/index.ts",
+    "init-db": "tsx src/init-db.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

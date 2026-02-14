@@ -9,7 +9,7 @@ services:
     region: oregon
     plan: free
     buildCommand: npm install --include=dev && npm run build:web && npm run etl
-    startCommand: npm run db:migrate && npm run start:web
+    startCommand: npm run db:init && npm run start:web
     envVars:
       - key: DATABASE_URL
         fromDatabase:
